@@ -1,0 +1,152 @@
+#include <Wire.h>
+#include <EEPROM.h>
+#include <Adafruit_GFX.h>    
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <Ticker.h>
+#include <AHT20.h>
+#include <DFRobot_ENS160.h>
+
+#define I2C_COMMUNICATION  //I2C communication. Comment out this line of code if you want to use SPI communication.
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+
+//#ifdef  I2C_COMMUNICATION
+DFRobot_ENS160_I2C ENS160(&Wire, /*I2CAddr*/ 0x53);
+//#else
+//uint8_t csPin = D15;
+//DFRobot_ENS160_SPI ENS160(&SPI, csPin);
+//#endif
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+
+void setup(void) {
+
+  // Init the sensor
+while( NO_ERR != ENS160.begin() ){
+delay(3000);
+}
+
+// Use this initializer if using a 1.8" TFT screen:
+tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+tft.fillScreen(ST77XX_BLACK);
+tft.setRotation(3);
+delay(3500);
+
+ENS160.setPWRMode(ENS160_STANDARD_MODE);
+ENS160.setTempAndHum(/*temperature=*/25.0, /*humidity=*/50.0); //imposta temperatura e umidità
+
+// tft print function!
+tftPrintTest();
+delay(3000);
+}
+
+void loop() {
+
+  //tft.fillScreen(ST7735_BLACK);  // fill screen with black color
+  tft.drawFastHLine(0, 25,  tft.width(), ST7735_WHITE);   // draw horizontal white line at position (0, 25)
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(25, 5);   
+  tft.setTextColor(ST7735_MAGENTA, ST7735_BLACK);     // set text color to red and black background
+  tft.print("AIR QUALITY STATION");
+  tft.setCursor(60, 15);   
+  tft.print("ENS160");
+
+  tft.drawFastHLine(0, 50,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 50)
+  tft.drawFastHLine(0, 75,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 75)
+  tft.drawFastHLine(0, 100,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 100)
+  tft.drawFastHLine(0, 125,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 125)
+
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);     // set text color to red and black background
+  tft.setCursor(0, 30);              // move cursor to position (0, 30) pixel
+  tft.print("SENSOR OPERATING STATUS :");
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(0, 55);              // move cursor to position (0, 55) pixel
+  tft.print("AIR QUALITY INDEX :");
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(0, 80);              // move cursor to position (0, 80) pixel
+  tft.print("CONC.TOT.VOLATILE ORGANIC :");
+  tft.setTextColor(ST7735_ORANGE, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(0, 105);              // move cursor to position (0, 105) pixel
+  tft.print("CARBON DIOXIDE EQ.C :");
+
+   // 1: print Sensor operating status
+
+uint8_t Status = ENS160.getENS160Status();
+
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);  // set text color to yellow and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(70, 40);
+  tft.print(Status);
+ 
+  // 2: print Air quality index
+
+  uint8_t AQI = ENS160.getAQI();
+
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(70, 65); // Get the air quality index, Return value: 1-Excellent, 2-Good, 3-Moderate, 4-Poor, 5-Unhealthy
+  tft.print(AQI);
+
+  // 3: print Concentration of total volatile organic compounds
+
+uint16_t TVOC = ENS160.getTVOC();
+
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(60, 90);
+  tft.print(TVOC);
+  tft.setCursor(85,90);
+  tft.print("ppb");
+
+  // 4: Carbon dioxide equivalent concentration
+
+uint16_t ECO2 = ENS160.getECO2();
+
+  tft.setTextColor(ST7735_ORANGE, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(60, 115);
+  tft.print(ECO2);  //Five levels: Excellent(400 - 600), Good(600 - 800), Moderate(800 - 1000),Poor(1000 - 1500), Unhealthy(> 1500)
+  tft.setCursor(85,115);
+  tft.print("ppm");
+
+delay(1000);
+}
+
+void tftPrintTest() {
+tft.setTextWrap(false);
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(0, 50);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(0);
+tft.print(" Giuseppe");
+tft.print(" Demetrio ");
+tft.print("Branca");
+tft.setCursor(35, 65);
+tft.setTextColor(ST77XX_ORANGE);
+tft.setTextSize(0);
+tft.print("Arduino Design");
+  
+delay(3000);
+
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(40, 30);
+tft.setTextColor(ST77XX_CYAN);
+tft.setTextSize(2);
+tft.println("HELLO!");
+tft.setCursor(40, 60);
+tft.setTextColor(ST77XX_YELLOW);
+tft.setTextSize(2);
+tft.println("ENS160");
+tft.setCursor(40, 90);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(2);
+tft.println("CHIP");
+  
+delay(3500);
+
+tft.fillScreen(ST77XX_BLACK);
+}
