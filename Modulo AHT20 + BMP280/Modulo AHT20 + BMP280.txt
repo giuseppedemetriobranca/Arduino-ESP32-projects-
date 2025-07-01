@@ -1,0 +1,142 @@
+#include <Wire.h>
+#include <EEPROM.h>
+#include <Adafruit_GFX.h>    
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <Ticker.h>
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+#include <Adafruit_BMP280.h>
+
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+Adafruit_BMP280 bmp;
+
+void setup() {
+
+// Use this initializer if using a 1.8" TFT screen:
+tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+tft.fillScreen(ST77XX_BLACK);
+tft.setRotation(3);
+delay(3500);
+
+Serial.begin(115200);
+bmp.begin();
+
+// tft print function!
+tftPrintTest();
+delay(3000);
+
+}
+ 
+void loop() {
+
+  //tft.fillScreen(ST7735_BLACK);  // fill screen with black color
+  tft.drawFastHLine(0, 25,  tft.width(), ST7735_WHITE);   // draw horizontal white line at position (0, 30)
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(35, 5);   
+  tft.setTextColor(ST7735_MAGENTA, ST7735_BLACK);     // set text color to red and black background
+  tft.print("WEATHER STATION");
+  tft.setCursor(60, 15);   
+  tft.print("BMP280");
+
+  tft.drawFastHLine(0, 60,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 60)
+  tft.drawFastHLine(0, 90,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 90)
+  tft.drawFastHLine(0, 120,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 120)
+
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);     // set text color to red and black background
+  tft.setCursor(42, 31);              // move cursor to position (42, 31) pixel
+  tft.print("TEMPERATURE =");
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(51, 65);              // move cursor to position (51, 65) pixel
+  tft.print("ALTITUDE =");
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(51, 95);              // move cursor to position (51, 95) pixel
+  tft.print("PRESSURE =");
+  tft.setTextSize(2);                 // text size = 2
+
+if (! bmp.begin()) {
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(2, 50);
+tft.setTextColor(ST77XX_RED, ST7735_BLACK); 
+tft.setTextSize(0);
+tft.println("Failed to find BMP280 chip");
+delay(2000);
+tft.fillScreen(ST77XX_BLACK);
+
+}else{
+
+bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+
+   // 1: print TEMPERATURE
+
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);  // set text color to yellow and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(55, 42);
+  tft.print(bmp.readTemperature());
+  tft.drawCircle(90, 45, 2, ST7735_GREEN);  // print degree symbol ( ° )
+  tft.setCursor(95, 42);
+  tft.print("C");
+ 
+  // 2: print ALTITUDE
+
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(50, 75);
+  tft.print(bmp.readAltitude(1013.25));
+  tft.setCursor(90,75);
+  tft.print("m");
+
+  // 3: print PRESSURE
+
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(50, 107);
+  tft.print(bmp.readPressure());
+  tft.setCursor(105,107);
+  tft.print("Pa");
+
+}
+}
+
+void tftPrintTest() {
+tft.setTextWrap(false);
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(0, 50);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(0);
+tft.print(" Giuseppe");
+tft.print(" Demetrio ");
+tft.print("Branca");
+tft.setCursor(35, 65);
+tft.setTextColor(ST77XX_ORANGE);
+tft.setTextSize(0);
+tft.print("Arduino Design");
+  
+delay(3000);
+
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(40, 30);
+tft.setTextColor(ST77XX_CYAN);
+tft.setTextSize(2);
+tft.println("HELLO!");
+tft.setCursor(40, 60);
+tft.setTextColor(ST77XX_YELLOW);
+tft.setTextSize(2);
+tft.println("BMP280");
+tft.setCursor(40, 90);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(2);
+tft.println("CHIP");
+  
+delay(3500);
+
+tft.fillScreen(ST77XX_BLACK);
+}
