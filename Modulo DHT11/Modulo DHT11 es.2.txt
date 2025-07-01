@@ -1,0 +1,110 @@
+#include <EEPROM.h>
+#define DHTTYPE DHT11
+#include <Adafruit_GFX.h>    
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <Ticker.h>
+#include <DHT11.h>
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+
+DHT11 dht11 (13);
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+
+void setup(void) {
+
+// Use this initializer if using a 1.8" TFT screen:
+tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+tft.fillScreen(ST77XX_BLACK);
+tft.setRotation(3);
+delay(3500);
+
+// tft print function!
+tftPrintTest();
+delay(3000);
+
+}
+
+void loop() {
+char _buffer[8];
+int temperature = 0;
+int humidity = 0;
+
+// Attempt to read the temperature and humidity values from the DHT11 sensor.
+int result = dht11.readTemperatureHumidity(temperature, humidity);
+tft.setCursor(10, 10);
+tft.setTextColor(ST77XX_YELLOW);
+tft.setTextSize(2);
+tft.print("TEMPERATURA: ");
+tft.setCursor(10, 70);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(2);
+tft.print("UMIDITA: ");    
+
+  // Check the results of the readings.
+  // If the reading is successful, print the temperature and humidity values.
+  // If there are errors, print the appropriate error messages.
+  if (result == 0) {
+ sprintf( _buffer, " %02u.%02u", (int)temperature, (int)(temperature * 100) % 100 ); 
+  tft.setTextColor(ST77XX_YELLOW, ST7735_BLACK);
+  tft.setCursor(0, 30);
+  tft.setTextSize(2);
+   tft.print(_buffer);
+  tft.print(" C");
+   sprintf( _buffer, " %02u.%02u", (int)humidity, (int)(humidity * 100) % 100 );
+
+  tft.setTextColor(ST77XX_GREEN, ST7735_BLACK);
+  tft.setCursor(0, 90);
+  tft.setTextSize(2);
+   tft.print(_buffer);
+  tft.print(" %");
+} else {
+  // Print error message based on the error code.
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 50);
+  tft.setTextColor(ST77XX_RED, ST7735_BLACK); 
+  tft.setTextSize(0);
+  tft.println(DHT11::getErrorString(result));
+  delay(500);
+  tft.fillScreen(ST77XX_BLACK);
+}
+}
+
+void tftPrintTest() {
+  tft.setTextWrap(false);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 50);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(0);
+  tft.print(" Giuseppe");
+  tft.print(" Demetrio ");
+  tft.print("Branca");
+  tft.setCursor(35, 65);
+  tft.setTextColor(ST77XX_ORANGE);
+  tft.setTextSize(0);
+  tft.print("Arduino Design");
+  
+  delay(3000);
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(40, 30);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.setTextSize(2);
+  tft.println("HELLO!");
+  tft.setCursor(40, 60);
+  tft.setTextColor(ST77XX_YELLOW);
+  tft.setTextSize(2);
+  tft.println("WEATHER");
+  tft.setCursor(40, 90);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(2);
+  tft.println("STATION");
+  
+  delay(3500);
+
+  tft.fillScreen(ST77XX_BLACK);
+}
