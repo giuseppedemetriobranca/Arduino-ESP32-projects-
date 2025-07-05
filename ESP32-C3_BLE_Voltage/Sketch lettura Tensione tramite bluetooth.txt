@@ -1,0 +1,60 @@
+#include <Arduino.h>
+#include <NimBLEDevice.h> //installare Nimble-Arduino (h2zero) v.1.4.1
+
+#define SERVICE_UUID        "12345678-1234-5678-1234-56789abcdef0"
+#define CHARACTERISTIC_UUID "abcd1234-5678-1234-abcd-1234567890ab"
+
+NimBLECharacteristic* pCharacteristic;
+bool deviceConnected = false;
+
+const int analogPin = A1;
+
+class ServerCallbacks : public NimBLEServerCallbacks {
+void onConnect(NimBLEServer* pServer) {
+deviceConnected = true;
+}
+
+void onDisconnect(NimBLEServer* pServer) override {
+deviceConnected = false;
+NimBLEDevice::startAdvertising();
+}
+};
+
+void setup() {
+Serial.begin(115200);
+delay(1000);
+
+NimBLEDevice::init("ESP32C3_Voltage");
+NimBLEServer* pServer = NimBLEDevice::createServer();
+pServer->setCallbacks(new ServerCallbacks());
+
+NimBLEService* pService = pServer->createService(SERVICE_UUID);
+
+pCharacteristic = pService->createCharacteristic(
+CHARACTERISTIC_UUID,
+NIMBLE_PROPERTY::NOTIFY
+);
+
+pService->start();
+
+NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
+pAdvertising->addServiceUUID(SERVICE_UUID);
+pAdvertising->start();
+
+}
+
+void loop() {
+if (deviceConnected) {
+int raw = analogRead(analogPin);
+float pinVoltage = raw * (3.2 / 4095.0); //set 3,3 ( effettuare misura su uscita 3,3 di esp32-c3 per misura piu precisa )
+float voltage = pinVoltage * ((32.9+10.7)/10.7); //pinVoltage*((R1+R2)/R2) set R1 e R2 per misure piu precise
+
+char buffer[16];
+snprintf(buffer, sizeof(buffer), "%.3f V", voltage);
+pCharacteristic->setValue(buffer);
+pCharacteristic->notify(buffer);
+
+}
+
+  delay(1000);
+}
