@@ -1,0 +1,147 @@
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
+#include <DFRobot_BMI160.h>
+#include <EEPROM.h>
+#include <SPI.h>
+#include <Ticker.h>
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+
+// Inizializza display
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+// Inizializza sensore
+DFRobot_BMI160 bmi160;
+const int8_t i2c_addr = 0x69;
+
+// Variabili per i dati
+int16_t accel[3];  // x, y, z accelerometro
+int16_t gyro[3];   // x, y, z giroscopio
+
+void setup(){
+
+// Impostazioni Display 1.8" TFT screen:
+tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+tft.fillScreen(ST77XX_BLACK);
+tft.setRotation(3);
+delay(3500);
+
+// tft print function!
+tftPrintTest();
+delay(3000);
+
+Wire.begin();
+
+}
+
+void loop(){  
+
+// Inizializza BMI160
+if (bmi160.I2cInit(i2c_addr) != BMI160_OK) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(25, 60);
+  tft.setTextColor(ST77XX_RED);
+  tft.println("BMI160 non trovato!");
+
+} else {
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawFastHLine(0, 30,  tft.width(), ST7735_WHITE);   // draw horizontal white line at position (0, 30)
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(35, 7);   
+  tft.setTextColor(ST7735_MAGENTA, ST7735_BLACK);     // set text color to red and black background
+  tft.print("AccelGyroSensor");
+  tft.setCursor(60, 17);   
+  tft.print("BMI160");
+
+  tft.drawFastHLine(0, 76,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 76)
+  tft.drawFastHLine(0, 122,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 122)
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);     // set text color to red and black background
+  tft.setCursor(42, 37);              // move cursor to position (42, 39) pixel
+  tft.print("ACCELLEROMETRO");
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(51, 83);              // move cursor to position (51, 85) pixel
+  tft.print("GIROSCOPIO");
+  tft.setTextSize(1);                 // text size = 1
+
+// Legge accelerazione e giroscopio
+bmi160.getAccelData(accel);
+bmi160.getGyroData(gyro);    
+
+int rsla;
+int rslg;
+
+//get both accel and gyro data from bmi160
+//parameter accelGyro is the pointer to store the data
+rsla = bmi160.getAccelData(accel);
+rslg = bmi160.getGyroData(gyro);
+
+if(rsla == 0) {
+
+//the first three are accel data
+ tft.setTextColor(ST77XX_WHITE);
+ tft.setCursor(15, 49); 
+ tft.print("X         Y         Z");
+ tft.setCursor(5, 59); 
+ tft.print(accel[0]*3.14/180.0);
+ tft.setCursor(60, 59);
+ tft.print(accel[1]*3.14/180.0);
+ tft.setCursor(125, 59);
+ tft.print(accel[2]*3.14/180.0);
+}
+if(rslg == 0) {
+
+//the following three data are accel data
+ tft.setTextColor(ST77XX_WHITE);
+ tft.setCursor(15, 95);
+ tft.print("X         Y         Z");
+ tft.setCursor(5, 105); 
+ tft.print(gyro[0]/16384.0);
+ tft.setCursor(60, 105);
+ tft.print(gyro[1]/16384.0);
+ tft.setCursor(125, 105);
+ tft.print(gyro[2]/16384.0);
+}
+  
+delay(100);
+
+}
+}
+
+void tftPrintTest() {
+tft.setTextWrap(false);
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(0, 50);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(0);
+tft.print(" Giuseppe");
+tft.print(" Demetrio ");
+tft.print("Branca");
+tft.setCursor(35, 65);
+tft.setTextColor(ST77XX_ORANGE);
+tft.setTextSize(0);
+tft.print("Arduino Design"); 
+delay(3000);
+
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(40, 30);
+tft.setTextColor(ST77XX_CYAN);
+tft.setTextSize(2);
+tft.println("HELLO!");
+tft.setCursor(40, 60);
+tft.setTextColor(ST77XX_YELLOW);
+tft.setTextSize(2);
+tft.println("BMI160");
+tft.setCursor(40, 90);
+tft.setTextColor(ST77XX_GREEN);
+tft.setTextSize(2);
+tft.println("CHIP");
+delay(3000);
+
+}
