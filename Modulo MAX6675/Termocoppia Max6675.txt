@@ -1,0 +1,114 @@
+#include <EEPROM.h>
+#include "max6675.h"
+#include <Adafruit_GFX.h>    
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <Ticker.h>
+
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+
+#define thermoSO 32
+#define thermoCS 33
+#define thermoSCK 25
+
+MAX6675 thermocouple(thermoSCK, thermoCS, thermoSO);
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+
+void setup(void) {
+
+// Use this initializer if using a 1.8" TFT screen:
+tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+tft.fillScreen(ST77XX_BLACK);
+tft.setRotation(3);
+delay(3500);
+
+// tft print function!
+tftPrintTest();
+delay(3000);
+
+}
+
+void loop() {
+
+int tempC=thermocouple.readCelsius();
+
+if (tempC!=0) {
+
+//tft.fillScreen(ST7735_BLACK);  // fill screen with black color
+ 
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(40, 7);   
+  tft.setTextColor(ST7735_MAGENTA, ST7735_BLACK);     // set text color to red and black background
+  tft.print("TTERMOCOPPIA");
+  tft.setCursor(55, 17);   
+  tft.print("MAX6675");
+  tft.drawFastHLine(0, 30,  tft.width(), ST7735_WHITE);   // draw horizontal white line at position (0, 30)
+  tft.drawFastHLine(0, 100,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 76)
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);     // set text color to red and black background
+  tft.setCursor(42, 39);              // move cursor to position (25, 39) pixel
+  tft.print("TEMPERATURE =");
+  tft.setTextSize(2);                 // text size = 2
+
+  tft.setTextSize(4);                 // text size = 2
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to yellow and black background
+  tft.setCursor(25, 60);
+  tft.print(tempC);
+  tft.drawCircle(105, 62, 2, ST7735_YELLOW);  // print degree symbol ( ° )
+  tft.setCursor(114, 60);
+  tft.print("C");
+ 
+
+}else{
+
+tft.fillScreen(ST77XX_BLACK);
+tft.setCursor(3, 50);
+tft.setTextColor(ST77XX_RED, ST7735_BLACK); 
+tft.setTextSize(0);
+tft.println("Failed to find MAX6675chip");
+delay(2000);
+tft.fillScreen(ST77XX_BLACK);
+
+}
+
+ delay(1000);
+}
+
+void tftPrintTest() {
+  tft.setTextWrap(false);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 50);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(0);
+  tft.print(" Giuseppe");
+  tft.print(" Demetrio ");
+  tft.print("Branca");
+  tft.setCursor(35, 65);
+  tft.setTextColor(ST77XX_ORANGE);
+  tft.setTextSize(0);
+  tft.print("Arduino Design");
+  
+  delay(3000);
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(45, 30);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.setTextSize(2);
+  tft.println("HELLO!");
+  tft.setCursor(15, 60);
+  tft.setTextColor(ST77XX_YELLOW);
+  tft.setTextSize(2);
+  tft.println("TERMOCOPPIA");
+  tft.setCursor(40, 90);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(2);
+  tft.println("MAX6675");
+  
+  delay(3500);
+
+  tft.fillScreen(ST77XX_BLACK);
+}
