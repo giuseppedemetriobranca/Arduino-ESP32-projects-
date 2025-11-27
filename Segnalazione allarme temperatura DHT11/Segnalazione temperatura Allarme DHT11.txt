@@ -1,0 +1,149 @@
+#include <EEPROM.h>
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <DHT11.h>
+
+#define TFT_CS   15
+#define TFT_RST   2
+#define TFT_DC    4
+#define TFT_MOSI 23  // Data out
+#define TFT_SCLK 18  // Clock out
+int ledPinR = 14;
+int ledPinG = 27;
+DHT11 dht11 (13);
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+ 
+void setup(void)
+{
+ pinMode(ledPinR, OUTPUT); 
+ pinMode(ledPinG, OUTPUT); 
+// Use this initializer if using a 1.8" TFT screen:
+  tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setRotation(3);
+
+  // tft print function!
+  tftPrintTest();
+  delay(3000);
+
+}
+ 
+// main loop
+void loop() {
+
+char _buffer[8];
+int temperature = 0;
+int humidity = 0;
+int result = dht11.readTemperatureHumidity(temperature, humidity);
+
+  tft.drawFastHLine(0, 30,  tft.width(), ST7735_WHITE);   // draw horizontal white line at position (0, 30)
+  tft.setTextSize(1);                 // text size = 1
+  tft.setCursor(30, 10);   
+  tft.setTextColor(ST7735_GREEN, ST7735_BLACK);     // set text color to green and black background
+  tft.print("WEATHER STATION");
+  tft.drawFastHLine(0, 76,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 76)
+  tft.drawFastHLine(0, 122,  tft.width(), ST7735_WHITE);  // draw horizontal white line at position (0, 122)
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);     // set text color to red and black background
+  tft.setCursor(42, 39);              // move cursor to position (42, 39) pixel
+  tft.print("TEMPERATURE =");
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to cyan and black background
+  tft.setCursor(51, 85);              // move cursor to position (51, 85) pixel
+  tft.print("HUMIDITY =");
+  tft.setTextSize(2);                 // text size = 2
+ 
+ if(temperature > 20) {   // temperature >25
+ // Print error message based on the error code.
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(30, 50);
+  tft.setTextColor(ST77XX_ORANGE, ST7735_BLACK); 
+  tft.setTextSize(2); 
+  tft.println("ALLARME");
+  lampeggiaLEDR();
+  delay(500);
+  tft.fillScreen(ST77XX_BLACK);
+ }
+
+  else if(result == 0) {   // temperature diversa da 0
+  lampeggiaLEDG();
+  // print temperature (in °C)
+  sprintf( _buffer, " %02u.%02u", (int)temperature, (int)(temperature * 100) % 100 );
+  tft.setTextColor(ST7735_YELLOW, ST7735_BLACK);  // set text color to yellow and black background
+  tft.setCursor(26, 54);
+  tft.print(_buffer);
+  tft.drawCircle(105, 56, 2, ST7735_YELLOW);  // print degree symbol ( ° )
+  tft.setCursor(114, 54);
+  tft.print("C");
+ 
+  // 2: print humidity
+  sprintf( _buffer, "%02u.%02u %%", (int)humidity, (int)(humidity * 100) % 100 );
+  tft.setTextColor(ST7735_CYAN, ST7735_BLACK);  // set text color to magenta and black background
+  tft.setCursor(38, 100);
+  tft.print(_buffer);
+
+}else {
+    
+ // Print error message based on the error code.
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 50);
+  tft.setTextColor(ST77XX_RED, ST7735_BLACK); 
+  tft.setTextSize(0);
+  tft.println("Failed to find DHT11 sensor");
+  delay(500);
+  tft.fillScreen(ST77XX_BLACK);
+}
+}
+
+// Lampeggio LED RED (breve segnale)
+void lampeggiaLEDR() {
+    digitalWrite(ledPinR, HIGH);
+    delay(150);
+    digitalWrite(ledPinR, LOW);
+    delay(50);
+}
+
+// Lampeggio LED GREEN (breve segnale)
+void lampeggiaLEDG() {
+    digitalWrite(ledPinG, HIGH);
+    delay(150);
+    digitalWrite(ledPinG, LOW);
+    delay(150);
+}
+
+
+void tftPrintTest() {
+  tft.setTextWrap(false);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 50);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(0);
+  tft.print(" Giuseppe");
+  tft.print(" Demetrio ");
+  tft.print("Branca");
+  tft.setCursor(35, 65);
+  tft.setTextSize(1.5);
+  tft.setTextColor(ST77XX_ORANGE);
+  tft.print("Arduino Design");
+
+
+  delay(3500);
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(30, 30);
+  tft.setTextColor(ST77XX_MAGENTA);
+  tft.setTextSize(2);
+  tft.println("HELLO!");
+  tft.setCursor(30, 60);
+  tft.setTextColor(ST77XX_YELLOW);
+  tft.setTextSize(2);
+  tft.println("WEATHER");
+  tft.setCursor(30, 90);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.setTextSize(2);
+  tft.println("STATION");
+  
+  delay(3500);
+
+  tft.fillScreen(ST77XX_BLACK);
+}
