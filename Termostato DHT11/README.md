@@ -1,0 +1,1 @@
+In questo progetto viene proposto un termostato utilizzando un sensore DHT11 che va in allarme non appena la temperatura supera i 18 C° azionando una segnalazione d'allarme con led e attivando una ventola per il raffreddamento. Il sistema riprende il suo funzionamento normale non appena la temperatura ritorna sotto i 18 C°
