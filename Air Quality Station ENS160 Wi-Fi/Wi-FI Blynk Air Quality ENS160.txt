@@ -1,0 +1,168 @@
+#include <Wire.h>
+#include <EEPROM.h>
+#include <Adafruit_ST7735.h> 
+#include <SPI.h>
+#include <Adafruit_AHTX0.h>
+#include <DFRobot_ENS160.h>
+
+// ------------------- WI-FI -----------------------
+#define BLYNK_TEMPLATE_ID "TMPL4jlj2BhOk"
+#define BLYNK_TEMPLATE_NAME "Air Quality ESP32"
+#define BLYNK_AUTH_TOKEN "PsoiaDsDWfCcXGDuBGWWG8y-OVIuEAUh"
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+char ssid[] = "GiuseppeA53";
+char pass[] = "Giuseppe88";
+
+// -------------------- PIN TFT --------------------
+#define TFT_CS   15
+#define TFT_DC   4
+#define TFT_RST  2
+#define TFT_MOSI 23  
+#define TFT_SCLK 18  
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+// -------------------- SENSORI ---------------------
+DFRobot_ENS160_I2C ENS160(&Wire, 0x53);
+Adafruit_AHTX0 aht20;
+
+// ----------------Pin Led ------------------------
+unsigned long t = 0;
+const long lamp = 400;
+bool statoLed = false;
+int ledPinR = 14;
+int ledPinB = 27;
+
+void setup() {
+
+  Wire.begin();
+  pinMode(ledPinR, OUTPUT); 
+  pinMode(ledPinB, OUTPUT); 
+
+  // -------------------- TFT INIT --------------------
+  tft.initR(INITR_BLACKTAB);      
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setRotation(1);
+  delay(3500);
+
+  tftPrintTest();
+  delay(3000);
+
+  // -------------------- Sensori --------------------
+  ENS160.setPWRMode(ENS160_STANDARD_MODE);
+
+  // --------------------- WI-FI Serial -----------------
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+}
+void loop() {
+
+// -----------------WI-FI Begin ---------------
+Blynk.run();
+
+// ---------------- Sensor Begin ------------
+aht20.begin();
+ENS160.begin();
+
+ if (ENS160.getECO2() > 2000 ) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setCursor(30, 50);
+    tft.setTextColor(ST77XX_ORANGE); 
+    tft.setTextSize(2); 
+    tft.println("ALLARME");
+   // Blynk.notify("Allarme: AQI elevato!");
+    lampeggiaLEDR(); 
+    digitalWrite(ledPinB, LOW);
+    delay(500);
+    tft.fillScreen(ST77XX_BLACK);
+  }else { 
+    // -------------------- READ SENSOR --------------------
+    sensors_event_t humidity, temp;
+    aht20.getEvent(&humidity, &temp);
+    float tt = temp.temperature;
+    float hh = humidity.relative_humidity;
+    ENS160.setTempAndHum(tt, hh);
+
+    uint16_t aqi  = ENS160.getAQI();
+    uint16_t tvoc = ENS160.getTVOC();
+    uint16_t eco2 = ENS160.getECO2();
+
+    // -------------------- TFT --------------------
+    tft.fillScreen(ST77XX_BLACK);
+    tft.drawFastHLine(0, 30,  tft.width(), ST77XX_WHITE); 
+    tft.setTextSize(2);                 
+    tft.setCursor(20, 5);   
+    tft.setTextColor(ST77XX_MAGENTA);  
+    tft.print("Air Quality Station");
+    tft.setTextSize(1);
+    lampeggiaLEDB();
+    tft.setTextColor(ST77XX_GREEN);
+    tft.setCursor(5, 35);
+    tft.printf("Temperature: %.1f C\n", tt); // -10
+    tft.setTextColor(ST77XX_CYAN);
+    tft.setCursor(5, 55);
+    tft.printf("Umidity:     %.1f %%\n", hh);
+    tft.setTextColor(ST77XX_YELLOW);
+    tft.setCursor(5, 75);
+    tft.printf("AQI:         %d\n", aqi);  //  1-Excellent, 2-Good, 3-Moderate, 4-Poor, 5-Unhealthy
+    tft.setTextColor(ST77XX_RED);
+    tft.setCursor(5, 95);
+    tft.printf("TVOC:        %d ppb\n", tvoc);  // Excellent(400 - 800), Good(801 - 1200), Moderate(1201 - 2000),Poor(2001 - 3500),low poor(3501 - 5000), Unhealthy(> 5000)
+    tft.setTextColor(ST77XX_ORANGE);
+    tft.setCursor(5, 115);
+    tft.printf("eCO2:        %d ppm\n", eco2);  // Excellent(0 - 220), Good(221 - 660), Moderate(661 - 2200),Poor(2201 - 3500),low poor(3501 - 5000), Unhealthy(> 5000)
+
+    // -------------------- Send WI-FI SERIAL --------------------   
+    Blynk.virtualWrite(V0, tt);    // temperatura
+    Blynk.virtualWrite(V1, hh);    // umidità
+    Blynk.virtualWrite(V2, aqi);   // AQI
+    Blynk.virtualWrite(V3, tvoc);  // TVOC
+    Blynk.virtualWrite(V4, eco2);  // eCO2
+
+    delay(1000);
+  }
+}
+// -------------------- funzioni LED --------------------
+void lampeggiaLEDR() {
+    digitalWrite(ledPinR, HIGH);
+    delay(150);
+    digitalWrite(ledPinR, LOW);
+    delay(50);
+}
+void lampeggiaLEDB (){
+  unsigned long tA = millis();
+  if(tA - t >= lamp){
+    t = tA;
+    statoLed = !statoLed;
+    digitalWrite(ledPinB , statoLed);
+  }
+}
+// -------------------- Schermata Iniziale --------------------
+void tftPrintTest() {
+  tft.setTextWrap(false);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(5, 50);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(0);
+  tft.print("Giuseppe Demetrio Branca");
+  tft.setCursor(5, 65);
+  tft.setTextSize(2);
+  tft.setTextColor(ST77XX_MAGENTA);
+  tft.print("ESP32 Design");
+  delay(3000);
+
+  tft.fillScreen(ST77XX_BLACK);
+  delay(1000);
+  tft.setCursor(30, 30);
+  tft.setTextSize(2);
+  tft.setTextColor(ST77XX_MAGENTA);
+  tft.println("HELLO!");
+  tft.setCursor(20, 60);
+  tft.setTextColor(ST77XX_YELLOW);
+  tft.println("AIR QUALITY");
+  tft.setCursor(30, 90);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.println("STATION");
+  delay(3000);
+  tft.fillScreen(ST77XX_BLACK);
+}
