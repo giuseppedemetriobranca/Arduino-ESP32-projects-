@@ -1,0 +1,1 @@
+In questo progetto utilizzo un ESP32 con board per Display per creare una stazione per il rilevamento di dati di qualità aria utilizzando un sensore ENS160. I dati vengono riportati sul display ed e possibile visionarli tramite app utilizzando Blink IoT applicazione scaricabile da play store
