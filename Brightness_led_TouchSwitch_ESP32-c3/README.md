@@ -1,0 +1,1 @@
+In questo progetto utilizzo un ESP32-C3, con display 0.91,per regolare la luminosità di un led utilizzando un pulsante modulo touch. Il sistema funziona con pressione breve on/off, pressione per piu di un secondo, regolazione luminosità.
