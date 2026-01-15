@@ -1,0 +1,99 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <BMI160Gen.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+float pitchOffset = 0;
+float rollOffset  = 0;
+float pitchFilt = 0;
+float rollFilt  = 0;
+
+void calibrate() {
+  pitchOffset = 0;
+  rollOffset  = 0;
+
+  for (int i = 0; i < 200; i++) {
+    int ax, ay, az;
+    BMI160.readAccelerometer(ax, ay, az);
+
+    float axg = ax / 16384.0;
+    float ayg = ay / 16384.0;
+    float azg = az / 16384.0;
+
+    pitchOffset += atan2(axg, sqrt(ayg*ayg + azg*azg));
+    rollOffset  += atan2(ayg, sqrt(axg*axg + azg*azg));
+    delay(5);
+  }
+
+  pitchOffset /= 200.0;
+  rollOffset  /= 200.0;
+}
+
+void setup() {
+  Wire.begin(8, 9);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  if (!BMI160.begin(BMI160GenClass::I2C_MODE, 0x69)) {  // prova 0x68 se non va
+    while (1);
+  }
+
+  calibrate();   // calibrazione automatica all’avvio
+}
+
+void loop() {
+  int ax, ay, az;
+  BMI160.readAccelerometer(ax, ay, az);
+
+  float axg = ax / 16384.0;
+  float ayg = ay / 16384.0;
+  float azg = az / 16384.0;
+
+  // invertiamo le assi
+  float pitch = -(atan2(axg, sqrt(ayg*ayg + azg*azg)) - pitchOffset);
+  float roll  = (atan2(ayg, sqrt(axg*axg + azg*azg)) - rollOffset);
+
+  pitch *= 180.0 / PI;
+  roll  *= 180.0 / PI;
+
+  // filtro di fluidità
+  pitchFilt = pitchFilt * 0.85 + pitch * 0.15;
+  rollFilt  = rollFilt  * 0.85 + roll  * 0.15;
+
+  drawLevel(pitchFilt, rollFilt);
+  delay(20);
+}
+
+void drawLevel(float pitch, float roll) {
+  display.clearDisplay();
+ 
+  int cx = SCREEN_WIDTH / 2;
+  int cy = SCREEN_HEIGHT / 2;
+  int radius = 6;  // cerchio centrale OK
+
+  int bx = map(pitch, -10, 10, 0, SCREEN_WIDTH);
+  int by = map(roll, -10, 10, 0, SCREEN_HEIGHT);
+
+  // croce centrale
+  
+  display.drawLine(0, cy-1, SCREEN_WIDTH, cy-1, WHITE);
+  display.drawLine(cx, 0, cx, SCREEN_HEIGHT, WHITE);
+
+  float dist = sqrt((bx - cx)*(bx - cx) + (by - cy)*(by - cy));
+  if (dist < radius) {
+    display.fillCircle(cx, cy, radius, WHITE);  // bianco sul OLED = verde visivo
+  } else {
+    display.drawCircle(cx, cy, radius, WHITE);
+  }
+
+  // pallina
+  display.fillCircle(bx, by, 4, WHITE);
+
+  display.display();
+}
