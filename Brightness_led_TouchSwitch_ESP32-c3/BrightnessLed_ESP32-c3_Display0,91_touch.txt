@@ -1,0 +1,94 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+#define TOUCH_PIN 4
+#define LED_PIN   3
+
+int brightness = 128;
+bool ledState = false;
+bool lastTouch = false;
+
+unsigned long pressTime = 0;
+bool adjusting = false;
+bool increase = true;
+
+void setup() {
+  pinMode(TOUCH_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  ledcAttach(LED_PIN, 5000, 8); // PWM 8bit
+
+  Wire.begin(8,9);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.display();
+}
+
+void loop() {
+  bool touch = digitalRead(TOUCH_PIN);
+
+  // Rileva inizio pressione
+  if (touch && !lastTouch) {
+    pressTime = millis();
+    adjusting = false;
+  }
+
+  // Se tenuto premuto più di 400ms → modalità dimmer
+  if (touch && (millis() - pressTime > 1000)) {
+    adjusting = true;
+  }
+
+  // Rilasciato
+  if (!touch && lastTouch) {
+    if (!adjusting) {
+      ledState = !ledState;
+    }
+  }
+
+  // Regolazione luminosità
+  if (adjusting && touch) {
+    if (increase) brightness += 2;
+    else brightness -= 2;
+
+    if (brightness >= 255) { brightness = 255; increase = false; }
+    if (brightness <= 5)   { brightness = 5;   increase = true; }
+
+    ledState = true;
+    delay(15);
+  }
+
+  // LED
+  if (ledState) ledcWrite(LED_PIN, brightness);
+  else ledcWrite(LED_PIN, 0);
+
+  drawDisplay();
+  lastTouch = touch;
+}
+
+void drawDisplay() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  int percent = map(brightness, 0, 255, 0, 100);
+
+  display.setCursor(0,0);
+  display.print("BRIGTHNESS");
+  display.setTextSize(2);
+  display.setCursor(0,15);
+  display.print(percent);
+  display.print("%");
+
+  display.setCursor(80,15);
+  if (ledState) display.print("ON");
+  else display.print("OFF");
+
+  display.display();
+}
