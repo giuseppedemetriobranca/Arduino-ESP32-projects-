@@ -1,0 +1,169 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// ================= OLED =================
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// ================= PIN ==================
+const int TOUCH_MODE = 3;   // touch esterno MODE / TIME
+const int TOUCH_TRIG = 5;   // touch esterno TRIGGER
+
+const int MOS1 = 1;        // MOSFET banco 1 (ACTIVE LOW)
+const int MOS2 = 2;        // MOSFET banco 2 (ACTIVE LOW)
+
+// ================= TOUCH =================
+const unsigned long LONG_PRESS = 600;   // ms
+
+// ================= STATI =================
+int mode = 0;   // 0=OFF, 1=L1, 2=L2
+int pulseIndex = 2;
+
+// Tempi saldatura (ms)
+unsigned long pulseTime[] = {2, 5, 10, 15, 20, 25, 30, 40, 45, 50};
+const int MAX_PULSE = sizeof(pulseTime) / sizeof(pulseTime[0]);
+
+// Presaldatura
+const unsigned long prePulseTime  = 2;
+const unsigned long prePulsePause = 15;
+
+// ================= VAR ===================
+unsigned long tPressStart = 0;
+bool touchHeld = false;
+bool welding = false;
+
+// ================= SETUP =================
+void setup() {
+
+  pinMode(MOS1, OUTPUT);
+  pinMode(MOS2, OUTPUT);
+
+  // MOSFET SPENTI (ACTIVE LOW)
+  digitalWrite(MOS1, HIGH);
+  digitalWrite(MOS2, HIGH);
+
+  pinMode(TOUCH_MODE, INPUT_PULLDOWN);
+  pinMode(TOUCH_TRIG, INPUT_PULLUP);
+
+  // I2C OLED (ESP32-C3)
+  Wire.begin(8, 9);   // SDA=8  SCL=9
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.setRotation(2);   // ruota se necessario
+  display.display();
+
+  updateDisplay();
+}
+
+// ================= LOOP ==================
+void loop() {
+  handleTouchMode();
+  handleTrigger();
+}
+
+// ================= TOUCH MODE =================
+void handleTouchMode() {
+
+  bool pressed = digitalRead(TOUCH_MODE);
+
+  if (pressed && !touchHeld) {
+    touchHeld = true;
+    tPressStart = millis();
+  }
+
+  if (!pressed && touchHeld) {
+    touchHeld = false;
+
+    unsigned long pressTime = millis() - tPressStart;
+
+    if (pressTime < LONG_PRESS) {
+      // CLICK BREVE → cambia livello
+      mode++;
+      if (mode > 2) mode = 0;
+    } else {
+      // PRESSIONE LUNGA → aumenta tempo
+      pulseIndex++;
+      if (pulseIndex >= MAX_PULSE) pulseIndex = 0;
+    }
+    updateDisplay();
+  }
+}
+
+// ================= TOUCH TRIGGER =================
+void handleTrigger() {
+
+  if (digitalRead(TOUCH_TRIG)==LOW) {
+    eseguiSaldatura();
+    delay(1500);   // blocco anti-doppio colpo
+  }
+}
+
+// ================= SALDATURA =================
+void eseguiSaldatura() {
+
+  if (mode == 0) return;
+
+  welding = true;
+  updateDisplay();
+
+  // Presaldatura
+  attivaMOS(true);
+  delay(prePulseTime);
+  attivaMOS(false);
+
+  delay(prePulsePause);
+
+  // Impulso principale
+  attivaMOS(true);
+  delay(pulseTime[pulseIndex]);
+  attivaMOS(false);
+
+  welding = false;
+  updateDisplay();
+}
+
+// ================= MOS CONTROL =================
+void attivaMOS(bool on) {
+
+  if (on) {
+    if (mode == 1) {
+      digitalWrite(MOS1, LOW);
+    } else if (mode == 2) {
+      digitalWrite(MOS1, LOW);
+      digitalWrite(MOS2, LOW);
+    }
+  } else {
+    digitalWrite(MOS1, HIGH);
+    digitalWrite(MOS2, HIGH);
+  }
+}
+
+// ================= DISPLAY =================
+void updateDisplay() {
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  if (welding) display.println("*** WELDING ***");
+  else         display.println("SPOT WELDER");
+
+  display.setCursor(0, 12);
+  display.print("MODE: ");
+  if (mode == 0) display.println("OFF");
+  else if (mode == 1) display.println("L1");
+  else display.println("L1+L2");
+
+  display.setCursor(0, 22);
+  display.print("TIME: ");
+  display.setCursor(75, 12);
+  display.setTextSize(2);
+  display.print(pulseTime[pulseIndex]);
+  display.println("ms");
+
+  display.display();
+}
