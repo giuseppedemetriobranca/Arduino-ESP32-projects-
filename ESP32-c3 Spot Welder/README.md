@@ -1,0 +1,1 @@
+In questo progetto viene proposto uno Sketch per la gestione di una saldatrice a punti per batterie a litio, utilizzando un esp32-c3 come controllore, un display 0,91 OLED, e due bancate di mosfet 4n04r8 per due livelli di potenza. Tempi di saldatura regolabili da 2 a 50 ms
