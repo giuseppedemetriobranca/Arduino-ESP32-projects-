@@ -1,0 +1,355 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// ============== DISPLAY ===============
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// =============== PIN ===============
+const int TRIG = 5;
+const int TOUCH1 = 3;
+const int TOUCH2 = 4;
+const int MOS1 = 1;
+const int MOS2 = 2;
+
+// =============== TEMPI SALDATURA ===============
+unsigned int mainTime = 10;
+unsigned int preTime = 3;
+unsigned int preDelay = 10;
+unsigned int boostDelay = 5;
+unsigned int doubleDelay = 10;
+unsigned int boostTime = 3;
+unsigned int doubleTime = 10;
+unsigned int weldDelay = 2000;
+
+// =============== AUTO e LOCK ===============
+const unsigned int autoDelay = 3000;
+const unsigned int trigLock = 1200;
+
+// =============== STATI ===============
+enum Mode {OFF, NORMAL, NOPRE, BOOST, DOUBLEP};
+Mode mode = OFF;
+
+bool autoMode = false;
+bool welding = false;
+bool setupMenu = false;
+
+unsigned long lastWeld = 0;
+
+// =============== TIMER ===============
+unsigned long trigStart = 0;
+unsigned long t1Press = 0;
+unsigned long t2Press = 0;
+
+bool trigHeld=false;
+bool autoToggleDone=false;
+
+const int LONG_PRESS = 700;
+const int MENU_HOLD = 5000;
+const int AUTO_HOLD = 5000;
+
+//===============  MENU ===============
+int menuIndex = 0;
+const int MENU_ITEMS = 6;
+
+const char* menuNames[MENU_ITEMS] = {
+"PRE DELAY",
+"BOOST DELAY",
+"DOUBLE DELAY",
+"BOOST TIME",
+"DOUBLE TIME",
+"WELD DELAY"
+};
+
+void setup() {
+
+pinMode(MOS1,OUTPUT);
+pinMode(MOS2,OUTPUT);
+
+digitalWrite(MOS1,HIGH);
+digitalWrite(MOS2,HIGH);
+
+pinMode(TRIG,INPUT_PULLUP);
+pinMode(TOUCH1,INPUT);
+pinMode(TOUCH2,INPUT);
+
+Wire.begin(8,9);
+
+display.begin(SSD1306_SWITCHCAPVCC,0x3C);
+display.setRotation(2);
+
+updateDisplay();
+}
+
+void loop() {
+
+handleTrig();
+handleTouch1();
+handleTouch2();
+
+if(autoMode && !welding && !setupMenu){
+
+if(millis()-lastWeld > autoDelay){
+weld();
+}
+}
+}
+
+// ================= TRIG =================
+void handleTrig(){
+
+bool state = digitalRead(TRIG)==LOW;
+
+if(state && !trigHeld){
+trigHeld=true;
+trigStart=millis();
+autoToggleDone=false;
+}
+if(state && trigHeld){
+
+if(!autoToggleDone && millis()-trigStart>AUTO_HOLD){
+autoMode=!autoMode;
+autoToggleDone=true;
+
+updateDisplay();
+}
+}
+
+if(!state && trigHeld){
+
+if(!setupMenu){
+
+if(!autoToggleDone){
+
+if(millis()-lastWeld>weldDelay){
+weld();
+}
+}
+}
+trigHeld=false;
+}
+}
+
+// ================= TOUCH1 =================
+void handleTouch1(){
+
+bool state = digitalRead(TOUCH1);
+static bool held=false;
+
+if(state && !held){
+held=true;
+t1Press=millis();
+}
+if(!state && held){
+unsigned long pressTime = millis()-t1Press;
+
+if(!setupMenu){
+
+if(pressTime < LONG_PRESS){
+mode = (Mode)((mode+1)%5);
+}else{
+mainTime++;
+if(mainTime>40) mainTime=5;
+}
+}else{
+menuIndex++;
+if(menuIndex>=MENU_ITEMS) menuIndex=0;
+}
+held=false;
+
+updateDisplay();
+}
+}
+
+// ================= TOUCH2 =================
+void handleTouch2(){
+
+bool state = digitalRead(TOUCH2);
+static bool held=false;
+
+if(state && !held){
+held=true;
+t2Press=millis();
+}
+
+if(state && held){
+
+if(millis()-t2Press>MENU_HOLD){
+setupMenu=!setupMenu;
+autoMode=false;
+welding=false;
+held=false;
+
+updateDisplay();
+}
+}
+if(!state && held){
+unsigned long pressTime = millis()-t2Press;
+
+if(setupMenu){
+
+changeMenuValue();
+}else{
+if(pressTime<LONG_PRESS){
+preTime++;
+if(preTime>5) preTime=0;
+}
+}
+held=false;
+
+updateDisplay();
+}
+}
+
+// ================= SOTTO MENU =================
+void changeMenuValue(){
+
+switch(menuIndex){
+
+case 0:
+preDelay++;
+if(preDelay>25) preDelay=5;
+break;
+
+case 1:
+boostDelay+=1;
+if(boostDelay>15) boostDelay=3;
+break;
+
+case 2:
+doubleDelay++;
+if(doubleDelay>20) doubleDelay=5;
+break;
+
+case 3:
+boostTime++;
+if(boostTime>5) boostTime=1;
+break;
+
+case 4:
+doubleTime++;
+if(doubleTime>15) doubleTime=5;
+break;
+
+case 5:
+weldDelay+=200;
+if(weldDelay>5000) weldDelay=400;
+break;
+}
+}
+
+// ================= SALDATURA =================
+void weld(){
+
+if(mode==OFF) return;
+
+welding=true;
+lastWeld=millis();
+
+updateDisplay();
+
+if(mode!=NOPRE){
+
+pulse(preTime);
+preciseDelay(preDelay);
+}
+pulse(mainTime);
+
+if(mode==BOOST){
+
+preciseDelay(boostDelay);
+pulse(boostTime);
+}
+if(mode==DOUBLEP){
+
+preciseDelay(doubleDelay);
+pulse(doubleTime);
+}
+
+welding=false;
+
+updateDisplay();
+}
+
+// ================= IMPULSO =================
+void pulse(unsigned int ms){
+
+digitalWrite(MOS1,LOW);
+digitalWrite(MOS2,LOW);
+preciseDelay(ms);
+digitalWrite(MOS1,HIGH);
+digitalWrite(MOS2,HIGH);
+}
+
+// ================= DELAY PRECISO =================
+void preciseDelay(unsigned int ms){
+unsigned long start=micros();
+
+while(micros()-start < ms*1000);
+}
+
+// ================= DISPLAY SOTTO MENU =================
+void updateDisplay(){
+
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(0,0);
+
+if(setupMenu){
+
+display.println("SETUP MODE");
+display.println(menuNames[menuIndex]);
+
+switch(menuIndex){
+
+case 0: display.print(preDelay); break;
+case 1: display.print(boostDelay); break;
+case 2: display.print(doubleDelay); break;
+case 3: display.print(boostTime); break;
+case 4: display.print(doubleTime); break;
+case 5: display.print(weldDelay); break;
+}
+display.println(" ms");
+
+}else{
+
+// ================= DISPLAY =================
+
+if (welding) display.println("*** WELDING ***");
+else display.println("SPOT WELDER");
+
+display.print("MODE ");
+
+switch(mode){
+
+case OFF: display.println("OFF"); break;
+case NORMAL: display.println("NORMAL"); break;
+case NOPRE: display.println("NO PRE"); break;
+case BOOST: display.println("BOOST"); break;
+case DOUBLEP: display.println("DOUBLE"); break;
+
+}
+
+  display.print("PRE:");
+  display.print(preTime);
+  display.println(" MAIN:");
+  display.print("B:");
+  display.print(boostTime);
+  display.print(" D:");
+  display.print(doubleTime);
+  display.setCursor(75,16);
+  display.setTextSize(2);
+  display.print(mainTime);
+  display.println("ms");
+
+  if(autoMode){
+    display.setTextSize(1);
+    display.setCursor(90,0);
+    display.print("AUTO");
+}
+}
+display.display();
+}
