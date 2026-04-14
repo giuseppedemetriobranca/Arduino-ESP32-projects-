@@ -1,0 +1,312 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <EEPROM.h>
+
+// ============== DISPLAY ===============
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// =============== PIN ===============
+const int TRIG = 5;
+const int TOUCH1 = 3;
+const int TOUCH2 = 4;
+const int MOS1 = 1;
+const int MOS2 = 2;
+
+// =============== TEMPI SALDATURA ===============
+// VARIABILI (Default caricate se EEPROM vuota)
+unsigned int mainTime = 10;
+unsigned int preTime = 3; 
+unsigned int preDelay = 5;
+unsigned int boostDelay = 5;
+unsigned int boostTime = 5;
+unsigned int weldDelay = 2000;
+
+// =============== AUTO e LOCK ===============
+const unsigned int autoDelay = 3000;
+const unsigned int trigLock = 1200;
+
+// =============== STATI ===============
+enum Mode {OFF, NOPRE, NORMAL, BOOST};
+Mode mode = OFF;
+
+bool autoMode = false;
+bool welding = false;
+bool setupMenu = false;
+
+unsigned long lastWeld = 0;
+
+// =============== TIMER ===============
+unsigned long trigStart = 0;
+unsigned long t1Press = 0;
+unsigned long t2Press = 0;
+
+bool trigHeld=false;
+bool autoToggleDone=false;
+
+const int LONG_PRESS = 700;
+const int MENU_HOLD = 5000;
+const int AUTO_HOLD = 5000;
+
+//===============  MENU ===============
+int menuIndex = 0;
+const int MENU_ITEMS = 5;
+const char* menuNames[MENU_ITEMS] = {"PRE TIME", "PRE DELAY", "BOOST DELAY", "BOOST TIME", "WELD DELAY"};
+
+void setup() {
+
+pinMode(MOS1,OUTPUT);
+pinMode(MOS2,OUTPUT);
+
+digitalWrite(MOS1,HIGH);
+digitalWrite(MOS2,HIGH);
+
+pinMode(TRIG,INPUT_PULLUP);
+pinMode(TOUCH1,INPUT);
+pinMode(TOUCH2,INPUT);
+
+Wire.begin(8,9);
+display.begin(SSD1306_SWITCHCAPVCC,0x3C);
+display.setRotation(2);
+
+EEPROM.begin(64);
+loadSettings();
+
+updateDisplay();
+}
+
+void loop() {
+
+handleTrig();
+handleTouch1();
+handleTouch2();
+
+if(autoMode && !welding && !setupMenu){
+if(millis()-lastWeld > autoDelay){
+weld();
+}
+}
+}
+
+// ================= TRIG =================
+void handleTrig(){
+bool state = digitalRead(TRIG)==LOW;
+if(state && !trigHeld){
+trigHeld=true;
+trigStart=millis();
+autoToggleDone=false;
+}
+if(state && trigHeld){
+if(!autoToggleDone && millis()-trigStart>AUTO_HOLD){
+autoMode=!autoMode;
+autoToggleDone=true;
+
+updateDisplay();
+}
+}
+if(!state && trigHeld){
+if(!setupMenu){
+if(!autoToggleDone){
+if(millis()-lastWeld>weldDelay){
+weld();
+}
+}
+}
+trigHeld=false;
+}
+}
+
+// ================= TOUCH1 =================
+void handleTouch1(){
+bool state = digitalRead(TOUCH1);
+static bool held=false;
+if(state && !held){
+held=true;
+t1Press=millis();
+}
+if(!state && held){
+unsigned long pressTime = millis()-t1Press;
+if(!setupMenu){
+mode = (Mode)((mode+1)%4);
+}else{
+menuIndex++;
+if(menuIndex>=MENU_ITEMS) menuIndex=0;
+}
+held=false;
+updateDisplay();
+}
+}
+
+// ================= TOUCH2 =================
+void handleTouch2(){
+bool state = digitalRead(TOUCH2);
+static bool held=false;
+if(state && !held){
+held=true;
+t2Press=millis();
+}
+if(state && held){
+if(millis()-t2Press>MENU_HOLD){
+setupMenu=!setupMenu;
+if (!setupMenu) saveSettings();
+autoMode=false;
+welding=false;
+held=false;
+updateDisplay();
+}
+}
+if(!state && held){
+unsigned long pressTime = millis()-t2Press;
+if(setupMenu){
+changeMenuValue();
+}else{
+if(pressTime<LONG_PRESS){
+mainTime++;
+if(mainTime>20) mainTime=5;0;
+}
+}
+held=false;
+updateDisplay();
+}
+}
+
+// ================= SOTTO MENU =================
+void changeMenuValue(){
+switch(menuIndex){
+case 0:
+preTime++;
+if(preTime>10) preTime=1;
+break;
+case 1:
+preDelay++;
+if(preDelay>15) preDelay=5;
+break;
+case 2:
+boostDelay++;
+if(boostDelay>15) boostDelay=5;
+break;
+case 3:
+boostTime++;
+if(boostTime>15) boostTime=1;
+break;
+case 4:
+weldDelay+=200;
+if(weldDelay>5000) weldDelay=1000;
+break;
+}
+}
+
+// ================= SALDATURA =================
+void weld(){
+if(mode==OFF) return;
+welding=true;
+lastWeld=millis();
+updateDisplay();
+if (mode == NORMAL || mode == BOOST) {
+pulse(preTime);
+preciseDelay(preDelay);
+}
+pulse(mainTime);
+if(mode==BOOST){
+preciseDelay(boostDelay);
+pulse(boostTime);
+}
+welding=false;
+updateDisplay();
+}
+
+// ================= IMPULSO =================
+void pulse(unsigned int ms){
+if(ms > 45) ms = 45;
+digitalWrite(MOS1,LOW);
+digitalWrite(MOS2,LOW);
+preciseDelay(ms);
+digitalWrite(MOS1,HIGH);
+digitalWrite(MOS2,HIGH);
+}
+
+// ================= DELAY PRECISO =================
+void preciseDelay(unsigned int ms){
+unsigned long start = micros();
+while (micros() - start < (unsigned long)ms*1000);{
+yield();
+}
+}
+
+// ================= DISPLAY SOTTO MENU =================
+void updateDisplay(){
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(0,0);
+
+if(setupMenu){
+display.println("SETUP MODE");
+display.println(menuNames[menuIndex]);
+display.setTextSize(2);
+switch(menuIndex){
+case 0: display.print(preTime); break;
+case 1: display.print(preDelay); break;
+case 2: display.print(boostDelay); break;
+case 3: display.print(boostTime); break;
+case 4: display.print(weldDelay); break;
+}
+display.println(" ms");
+}else{
+
+// ================= DISPLAY =================
+if (welding) display.println("*** WELDING ***");
+else display.println("SPOT WELDER");
+display.print("MODE ");
+switch(mode){
+case OFF: display.println("OFF"); break;
+case NORMAL: display.println("NORMAL"); break;
+case NOPRE: display.println("NO PRE"); break;
+case BOOST: display.println("BOOST"); break;
+}
+  display.setTextSize(2);
+  display.print("P");
+  display.print(preTime);
+  display.print(" B");
+  display.print(boostTime);
+  display.setCursor(94,16);
+  display.print(mainTime);
+  display.setTextSize(1);
+  display.setCursor(94,8);
+  display.println("MAIN");
+  if(autoMode){
+    display.setTextSize(1);
+    display.setCursor(94,0);
+    display.print("AUTO");
+}
+}
+display.display();
+}
+
+void saveSettings() {
+  EEPROM.put(0, mainTime); 
+  EEPROM.put(4, preTime);
+  EEPROM.put(8, preDelay); 
+  EEPROM.put(12, boostDelay);
+  EEPROM.put(16, boostTime); 
+  EEPROM.put(20, weldDelay);
+  EEPROM.commit();
+}
+
+void loadSettings() {
+  unsigned int check;
+  EEPROM.get(0, check);
+  // Se il valore letto è assurdo (EEPROM vergine), inizializza
+  if (check == 0 || check > 100) {
+    saveSettings(); 
+  } else {
+    EEPROM.get(0, mainTime); 
+    EEPROM.get(4, preTime);
+    EEPROM.get(8, preDelay); 
+    EEPROM.get(12, boostDelay);
+    EEPROM.get(16, boostTime); 
+    EEPROM.get(20, weldDelay);
+  }
+}
